@@ -26,9 +26,10 @@ const PORT = process.env.PORT || 3000;
 // MIDDLEWARE GLOBAL
 // ================================================
 app.use(cors({
-  origin:         ['http://localhost:5173'],
+  origin:         ['http://localhost:5173', /\.vercel\.app$/],
   methods:        ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials:    true
 }));
 app.use(express.json());
 
@@ -91,4 +92,13 @@ const startServer = async () => {
   });
 };
 
-startServer();
+// Jalankan server saat bukan di Vercel
+if (process.env.VERCEL !== '1') {
+  startServer();
+} else {
+  // Di Vercel, hanya konek ke DB tanpa listen
+  connectDB();
+}
+
+// Export untuk Vercel Serverless
+module.exports = app;
