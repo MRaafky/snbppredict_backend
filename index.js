@@ -2,6 +2,10 @@ const express = require('express');
 const cors    = require('cors');
 require('dotenv').config();
 
+// Force bundler to include pg (Sequelize loads it dynamically)
+require('pg');
+require('pg-hstore');
+
 const { connectDB } = require('./src/config/database');
 
 // Daftarkan semua model
