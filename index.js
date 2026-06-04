@@ -34,6 +34,22 @@ app.use(cors({
 app.use(express.json());
 
 // ================================================
+// VERCEL: Pastikan DB terkoneksi sebelum request
+// ================================================
+let dbPromise = null;
+app.use(async (req, res, next) => {
+  if (!dbPromise) {
+    dbPromise = connectDB();
+  }
+  try {
+    await dbPromise;
+  } catch (e) {
+    // fallback ke in-memory sudah di-handle di connectDB
+  }
+  next();
+});
+
+// ================================================
 // INFO SERVER
 // ================================================
 app.get('/', (req, res) => {
@@ -67,44 +83,16 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ================================================
-// START SERVER + KONEKSI DATABASE
+// START SERVER (hanya di lokal, bukan di Vercel)
 // ================================================
-const startServer = async () => {
-  await connectDB(); // coba konek database, fallback ke in-memory otomatis
-
-  app.listen(PORT, () => {
-    console.log(`✅ Server berjalan di http://localhost:${PORT}`);
-    console.log('');
-    console.log('📋 Daftar Endpoint:');
-    console.log(`   POST   http://localhost:${PORT}/api/v1/auth/register`);
-    console.log(`   POST   http://localhost:${PORT}/api/v1/auth/login`);
-    console.log(`   GET    http://localhost:${PORT}/api/v1/students`);
-    console.log(`   GET    http://localhost:${PORT}/api/v1/students/:id`);
-    console.log(`   POST   http://localhost:${PORT}/api/v1/students`);
-    console.log(`   PUT    http://localhost:${PORT}/api/v1/students/:id`);
-    console.log(`   DELETE http://localhost:${PORT}/api/v1/students/:id`);
-    console.log(`   POST   http://localhost:${PORT}/api/v1/predict`);
-    console.log(`   GET    http://localhost:${PORT}/api/v1/dashboard`);
-    console.log(`   GET    http://localhost:${PORT}/api/v1/warnings`);
-    console.log(`   PUT    http://localhost:${PORT}/api/v1/warnings/:id/read`);
-    console.log(`   GET    http://localhost:${PORT}/api/v1/academic/scores`);
-    console.log(`   GET    http://localhost:${PORT}/api/v1/academic/monitoring`);
-  });
-};
-
-// Jalankan server saat bukan di Vercel
 if (process.env.VERCEL !== '1') {
+  const startServer = async () => {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`✅ Server berjalan di http://localhost:${PORT}`);
+    });
+  };
   startServer();
-} else {
-  // Di Vercel, konek ke DB saat cold start
-  let dbConnected = false;
-  const initDB = connectDB().then(() => { dbConnected = true; });
-  
-  // Middleware untuk memastikan DB sudah siap sebelum request
-  app.use(async (req, res, next) => {
-    if (!dbConnected) await initDB;
-    next();
-  });
 }
 
 // Export untuk Vercel Serverless
