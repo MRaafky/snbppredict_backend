@@ -96,8 +96,15 @@ const startServer = async () => {
 if (process.env.VERCEL !== '1') {
   startServer();
 } else {
-  // Di Vercel, hanya konek ke DB tanpa listen
-  connectDB();
+  // Di Vercel, konek ke DB saat cold start
+  let dbConnected = false;
+  const initDB = connectDB().then(() => { dbConnected = true; });
+  
+  // Middleware untuk memastikan DB sudah siap sebelum request
+  app.use(async (req, res, next) => {
+    if (!dbConnected) await initDB;
+    next();
+  });
 }
 
 // Export untuk Vercel Serverless
