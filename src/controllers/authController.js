@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
-const jwt    = require('jsonwebtoken');
-const User   = require('../models/User');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 // ================================================
 // REGISTER — Daftar akun baru
@@ -29,17 +29,17 @@ const register = async (req, res) => {
       nama,
       email,
       password: hashedPassword,
-      role:     role || 'siswa'
+      role: role || 'siswa'
     });
 
     res.status(201).json({
       success: true,
       message: 'Akun berhasil dibuat',
       data: {
-        id:    user.id,
-        nama:  user.nama,
+        id: user.id,
+        nama: user.nama,
         email: user.email,
-        role:  user.role
+        role: user.role
       }
     });
   } catch (error) {
@@ -88,7 +88,7 @@ const login = async (req, res) => {
       message: 'Login berhasil',
       token,
       user: {
-        id:   user.id,
+        id: user.id,
         nama: user.nama,
         role: user.role
       }
