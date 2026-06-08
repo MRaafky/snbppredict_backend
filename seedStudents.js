@@ -1,9 +1,11 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const { sequelize } = require('./src/config/database');
 const Student = require('./src/models/Student');
 const Prediksi = require('./src/models/Prediksi');
 const EarlyWarning = require('./src/models/EarlyWarning');
-const { getInMemoryStudents, getInMemoryWarnings } = require('./src/config/dataStore');
+const { getInMemoryWarnings } = require('./src/config/dataStore');
 
 const dummyNames = [
   "Anisa Wahyu", "Budi Rahmat", "Nur Salsabila", "Dewi Pratiwi", "Rizal Kurniawan",
@@ -32,24 +34,54 @@ async function seed() {
       await Student.destroy({ where: {} });
     }
 
-    const inMemoryData = getInMemoryStudents();
+    // Read from CSV
+    const csvPath = path.join(__dirname, 'data', 'cleaned_data.csv');
+    const csvData = fs.readFileSync(csvPath, 'utf8');
+    const lines = csvData.trim().split('\n').slice(1); // skip header
+    
+    let inMemoryData = lines.map(line => {
+      const cols = line.split(',');
+      if (cols.length < 17) return null;
+      return {
+        student_id: parseInt(cols[0]),
+        age: parseFloat(cols[1]),
+        gender: cols[2],
+        academic_level: cols[3],
+        study_hours: parseFloat(cols[4]),
+        self_study_hours: parseFloat(cols[5]),
+        online_classes_hours: parseFloat(cols[6]),
+        social_media_hours: parseFloat(cols[7]),
+        gaming_hours: parseFloat(cols[8]),
+        sleep_hours: parseFloat(cols[9]),
+        screen_time_hours: parseFloat(cols[10]),
+        internet_quality: cols[11],
+        mental_health_score: parseFloat(cols[12]),
+        focus_index: parseFloat(cols[13]),
+        burnout_level: parseFloat(cols[14]),
+        productivity_score: parseFloat(cols[15]),
+        exam_score: parseFloat(cols[16])
+      };
+    }).filter(s => s !== null);
+
     const studentsToInsert = inMemoryData.map((s, idx) => {
-      // Base score is exam_score (scaled if necessary, let's say exam_score in DB is usually 0-100)
-      // Some exam scores might be very low (1.0), so we normalize it to a reasonable scale for mapel
+      // Base score is exam_score
       const baseScore = s.exam_score < 40 ? 40 + s.exam_score : s.exam_score;
       
       // Random variance function
       const randomVar = (min, max) => Math.random() * (max - min) + min;
       const getSubjectScore = () => Math.min(100, Math.max(0, baseScore + randomVar(-15, 15)));
 
-      // Simulate attendance (mostly >80%, some lower based on study_hours)
+      // Simulate attendance
       const baseAtt = s.study_hours > 5 ? 90 : 70;
       const getAttendance = () => Math.min(100, Math.max(0, baseAtt + randomVar(-20, 10)));
 
+      const nmIdx = idx % dummyNames.length;
+      const prIdx = idx % dummyProdis.length;
+
       return {
         ...s,
-        nama: dummyNames[idx] || `Siswa ${idx + 1}`,
-        prodi: dummyProdis[idx] || `Prodi ${idx + 1}`,
+        nama: dummyNames[nmIdx] || `Siswa ${idx + 1}`,
+        prodi: dummyProdis[prIdx] || `Prodi ${idx + 1}`,
         math_score: getSubjectScore(),
         indo_score: getSubjectScore(),
         bio_score: getSubjectScore(),
@@ -64,8 +96,16 @@ async function seed() {
       };
     });
 
-    await Student.bulkCreate(studentsToInsert);
-    console.log(`Berhasil memasukkan ${studentsToInsert.length} siswa ke database.`);
+    // Chunk insert if too big (5000+ might be slow in one go depending on DB config)
+    const chunkSize = 1000;
+    let totalInserted = 0;
+    for (let i = 0; i < studentsToInsert.length; i += chunkSize) {
+      const chunk = studentsToInsert.slice(i, i + chunkSize);
+      await Student.bulkCreate(chunk);
+      totalInserted += chunk.length;
+    }
+    
+    console.log(`Berhasil memasukkan ${totalInserted} siswa ke database.`);
 
     const inMemoryWarnings = getInMemoryWarnings();
     if (inMemoryWarnings && inMemoryWarnings.length > 0) {
